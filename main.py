@@ -1,4 +1,4 @@
-"""G-EMO setup screen with explicit WhatsApp transport configuration."""
+"""G-EMO setup screen. Provider secrets are never persisted in settings JSON."""
 from __future__ import annotations
 
 import json
@@ -15,6 +15,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
 from kivy.utils import get_color_from_hex
 
+from core.secure_storage import AndroidKeystoreTokenStore, SecureStorageError
 from plugins.whatsapp_plugin import WhatsAppPlugin
 
 
@@ -34,7 +35,11 @@ class EmoSetupApp(App):
             if bundled.exists():
                 self.settings_path.write_text(bundled.read_text(encoding="utf-8"), encoding="utf-8")
             else:
-                self.settings_path.write_text(json.dumps({"whatsapp": {"enabled": True, "mode": "human", "transport": "human", "phone_number_id": "", "access_token": "", "api_version": "v22.0", "webjs_endpoint": "", "webjs_token": "", "monitor": False}}, indent=2), encoding="utf-8")
+                self.settings_path.write_text(json.dumps({"whatsapp": {"enabled": True, "mode": "human", "transport": "human"}}, indent=2), encoding="utf-8")
+        self.status = None
+        self.secret_store = None
+        self._secure_storage_error = ""
+        self._initialize_secure_storage()
         self.settings = self._load_settings()
 
         root = BoxLayout(orientation="vertical", padding=18, spacing=10)
@@ -48,7 +53,6 @@ class EmoSetupApp(App):
             halign="left", valign="middle", color=DARK,
             size_hint_y=None, height="54dp"
         ))
-
         root.add_widget(Label(text="WhatsApp transport", color=DARK, size_hint_y=None, height="24dp", halign="left"))
         self.transport = Spinner(
             text=self.settings.get("whatsapp", {}).get("transport", "human"),
@@ -56,26 +60,66 @@ class EmoSetupApp(App):
             size_hint_y=None, height="46dp"
         )
         root.add_widget(self.transport)
-
         self.phone_id = self._field(root, "Meta phone_number_id", self.settings.get("whatsapp", {}).get("phone_number_id", ""))
-        self.access_token = self._field(root, "Cloud API access token (private app storage)", self.settings.get("whatsapp", {}).get("access_token", ""), password=True)
+        # Secrets are deliberately not loaded into widgets or written back to JSON.
+        self.access_token = self._field(root, "Meta access token (encrypted Android Keystore)", "", password=True)
         self.webjs_endpoint = self._field(root, "WhatsApp Web bridge URL", self.settings.get("whatsapp", {}).get("webjs_endpoint", "http://127.0.0.1:8787"))
-        self.webjs_token = self._field(root, "Bridge bearer token", self.settings.get("whatsapp", {}).get("webjs_token", ""), password=True)
+        self.webjs_token = self._field(root, "Bridge bearer token (encrypted Android Keystore)", "", password=True)
 
-        self.status = Label(text="Ready — human mode is the safe default.", color=GRAY, size_hint_y=None, height="58dp", halign="left", valign="middle")
+        self.status = Label(text=self._initial_status(), color=GRAY, size_hint_y=None, height="76dp", halign="left", valign="middle")
         root.add_widget(self.status)
-
         save_button = Button(text="Save WhatsApp Settings", size_hint_y=None, height="48dp", background_normal="", background_color=BLUE)
         save_button.bind(on_press=self.save_settings)
         root.add_widget(save_button)
         test_button = Button(text="Test Selected Connection", size_hint_y=None, height="48dp", background_normal="", background_color=BLUE)
         test_button.bind(on_press=self.test_connection)
         root.add_widget(test_button)
+        clear_button = Button(text="Delete Stored Credentials", size_hint_y=None, height="44dp", background_normal="", background_color=(0.65, 0.12, 0.12, 1))
+        clear_button.bind(on_press=self.clear_credentials)
+        root.add_widget(clear_button)
         root.add_widget(Label(
-            text="Security: settings are stored in this app's private files directory, but tokens are not yet encrypted with Android Keystore. Use a test token until secure native storage is implemented. The webjs option requires a separately running bridge.",
+            text="Credentials are encrypted with AES-256-GCM using a key held by Android Keystore. If secure storage is unavailable, saving credentials is blocked; no plaintext fallback is used.",
             color=GRAY, halign="left", valign="middle"
         ))
         return root
+
+    def _initial_status(self):
+        if self._secure_storage_error:
+            return "SECURE STORAGE UNAVAILABLE — credentials cannot be saved. No plaintext fallback is permitted."
+        return "Ready — human mode is the safe default. Secret fields are blank by design."
+
+    def _initialize_secure_storage(self):
+        try:
+            self.secret_store = AndroidKeystoreTokenStore()
+        except SecureStorageError as exc:
+            self._secure_storage_error = str(exc)
+            self.secret_store = None
+        # One-time migration: attempt to encrypt legacy plaintext tokens, then always
+        # remove them from settings JSON. If encryption fails, discard the exposed copy.
+        try:
+            data = json.loads(self.settings_path.read_text(encoding="utf-8"))
+            whatsapp = data.get("whatsapp", {}) if isinstance(data, dict) else {}
+            if isinstance(whatsapp, dict):
+                legacy = {
+                    "access_token": "whatsapp_access_token",
+                    "webjs_token": "whatsapp_webjs_token",
+                }
+                for old_key, secret_name in legacy.items():
+                    secret = whatsapp.get(old_key)
+                    if secret:
+                        if self.secret_store is not None:
+                            try:
+                                self.secret_store.set(secret_name, str(secret))
+                            except SecureStorageError:
+                                self._secure_storage_error = "Legacy credential could not be encrypted and was removed; re-enter it after secure storage is available."
+                        else:
+                            self._secure_storage_error = "Legacy plaintext credential was removed because Android Keystore is unavailable."
+                    whatsapp.pop(old_key, None)
+                data["whatsapp"] = whatsapp
+                self._write_settings(data)
+        except (OSError, json.JSONDecodeError, TypeError):
+            # Do not attempt to recover credentials from malformed settings.
+            pass
 
     def _field(self, root, caption, value, password=False):
         root.add_widget(Label(text=caption, color=DARK, size_hint_y=None, height="22dp", halign="left"))
@@ -90,7 +134,26 @@ class EmoSetupApp(App):
         except (OSError, json.JSONDecodeError):
             return {}
 
+    def _write_settings(self, settings):
+        temp_path = self.settings_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.chmod(temp_path, 0o600)
+        temp_path.replace(self.settings_path)
+
     def save_settings(self, *_):
+        if (self.access_token.text.strip() or self.webjs_token.text.strip()) and self.secret_store is None:
+            self.status.text = "BLOCKED — Android Keystore is unavailable. Credentials were not saved anywhere."
+            return False
+        try:
+            if self.secret_store is not None:
+                if self.access_token.text.strip():
+                    self.secret_store.set("whatsapp_access_token", self.access_token.text.strip())
+                if self.webjs_token.text.strip():
+                    self.secret_store.set("whatsapp_webjs_token", self.webjs_token.text.strip())
+        except SecureStorageError:
+            self.status.text = "BLOCKED — encryption/storage failed. No plaintext credential was written."
+            return False
+
         settings = self._load_settings()
         whatsapp = settings.get("whatsapp")
         if not isinstance(whatsapp, dict):
@@ -101,29 +164,50 @@ class EmoSetupApp(App):
             "mode": "human" if transport == "human" else "api",
             "transport": transport,
             "phone_number_id": self.phone_id.text.strip(),
-            "access_token": self.access_token.text.strip(),
             "api_version": whatsapp.get("api_version") or "v22.0",
             "webjs_endpoint": self.webjs_endpoint.text.strip(),
-            "webjs_token": self.webjs_token.text.strip(),
             "monitor": False,
         })
+        # Defensive cleanup in case an older version left plaintext fields behind.
+        whatsapp.pop("access_token", None)
+        whatsapp.pop("webjs_token", None)
         settings["whatsapp"] = whatsapp
-        temp_path = self.settings_path.with_suffix(".tmp")
-        temp_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.chmod(temp_path, 0o600)
-        temp_path.replace(self.settings_path)
-        self.status.text = "Saved to app-private settings. Missing Cloud API credentials automatically use human mode."
+        try:
+            self._write_settings(settings)
+        except OSError:
+            self.status.text = "SAVE FAILED — settings could not be written."
+            return False
+        self.status.text = "Saved non-secret settings. Credentials, if supplied, were stored only in Android Keystore-backed encrypted storage."
         return settings
+
+    def clear_credentials(self, *_):
+        if self.secret_store is None:
+            self.status.text = "Secure storage unavailable; cannot verify credential deletion."
+            return False
+        try:
+            self.secret_store.delete("whatsapp_access_token")
+            self.secret_store.delete("whatsapp_webjs_token")
+            self.access_token.text = ""
+            self.webjs_token.text = ""
+            self.status.text = "Stored WhatsApp credentials deleted."
+            return True
+        except SecureStorageError:
+            self.status.text = "Credential deletion failed. Do not assume stored credentials were removed."
+            return False
 
     def test_connection(self, *_):
         settings = self.save_settings()
+        if not settings:
+            return
         if settings["whatsapp"].get("transport") == "human":
             self.status.text = "HUMAN MODE selected. No connection required and no message was sent."
             return
         self.status.text = "Testing selected connection… no message will be sent."
+
         def run_test():
-            result = WhatsAppPlugin(self.settings_path).test_connection()
+            result = WhatsAppPlugin(self.settings_path, secret_store=self.secret_store).test_connection()
             Clock.schedule_once(lambda _dt: self._show_test_result(result), 0)
+
         threading.Thread(target=run_test, daemon=True).start()
 
     def _show_test_result(self, result):
@@ -135,6 +219,7 @@ class EmoSetupApp(App):
             self.status.text = "HUMAN MODE — setup incomplete or manual transport selected. Use WhatsApp manually."
         else:
             self.status.text = f"CONNECTION FAILED — {result.get('http_status', '')} {result.get('detail', '')}"
+
 
 if __name__ == "__main__":
     EmoSetupApp().run()
