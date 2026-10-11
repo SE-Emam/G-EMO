@@ -12,6 +12,10 @@
 >
 > **API mode is per-plugin, not a promise of free access.** A plugin may use an official API only when the user has configured legitimate credentials and the service permits the requested operation. WhatsApp, Facebook, Canva, Drive, and email do not share one universal API. Human mode may require the user to confirm or finish actions in the target app.
 
+## Current verified status (2026-10-12)
+
+**NOT RELEASE-READY — Gemini-to-agent execution is not yet proven.** The repository now has native AccessibilityService source/configuration, an in-app permission status/settings control, a Python command inbox validator, a default-deny skill registry, and a one-time approval broker. These are implementation increments, not proof of a working end-to-end product. The approval broker is not yet connected to a user approval screen; the native inbox is not yet wired through a complete UI-to-skill execution flow; the APK build and merged manifest are still awaiting current CI evidence; no physical-device Gemini command test has passed. Do not treat the previously supplied APK as functional or install a new build as a verified release until the documented gates pass.
+
 ## Architecture
 
 ```text
