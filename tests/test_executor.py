@@ -27,6 +27,30 @@ class WhatsAppPluginTests(unittest.TestCase):
         self.assertEqual(result["status"], "HUMAN_ACTION_REQUIRED")
         self.assertEqual(result["mode"], "human")
 
+    def test_test_connection_missing_credentials_falls_back_without_network(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "", "access_token": ""})
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+            result = plugin.test_connection()
+        self.assertEqual(result["status"], "HUMAN_FALLBACK")
+        mocked.assert_not_called()
+
+    def test_test_connection_http_200_reports_connected(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token"})
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return b'{"id":"123","display_phone_number":"+201000000000"}'
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen", return_value=Response()):
+            result = plugin.test_connection()
+        self.assertEqual(result["status"], "CONNECTED")
+        self.assertEqual(result["display_phone_number"], "+201000000000")
+
+    def test_webjs_without_bridge_falls_back_to_human(self):
+        plugin = self.configure({"transport": "webjs", "webjs_endpoint": "", "webjs_token": ""})
+        result = plugin.execute({"to_phone": "201000000000", "text": "Hello"}, confirmed=True)
+        self.assertEqual(result["status"], "HUMAN_ACTION_REQUIRED")
+
     def test_human_transport_never_claims_sent(self):
         plugin = self.configure({"transport": "human"})
         self.assertEqual(plugin.execute({"text": "hello"}, confirmed=True)["status"], "HUMAN_ACTION_REQUIRED")
