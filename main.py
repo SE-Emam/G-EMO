@@ -13,6 +13,7 @@ from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
+from kivy.uix.scrollview import ScrollView
 from kivy.utils import get_color_from_hex
 
 from core.secure_storage import AndroidKeystoreTokenStore, SecureStorageError
@@ -74,6 +75,7 @@ class EmoSetupApp(App):
         )
         permission_settings.bind(on_press=self.open_accessibility_settings)
         root.add_widget(permission_settings)
+        Clock.schedule_once(self.check_accessibility_status, 0)
         root.add_widget(Label(text="WhatsApp transport", color=DARK, size_hint_y=None, height="24dp", halign="left"))
         self.transport = Spinner(
             text=self.settings.get("whatsapp", {}).get("transport", "human"),
@@ -102,7 +104,9 @@ class EmoSetupApp(App):
             text="Credentials are encrypted with AES-256-GCM using a key held by Android Keystore. If secure storage is unavailable, saving credentials is blocked; no plaintext fallback is used.",
             color=GRAY, halign="left", valign="middle"
         ))
-        return root
+        scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
+        scroll.add_widget(root)
+        return scroll
 
     def check_accessibility_status(self, *_):
         """Report actual Android service/opt-in state; never grant it automatically."""
