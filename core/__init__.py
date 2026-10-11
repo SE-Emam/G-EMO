@@ -1,0 +1,1 @@
+"""G-EMO command pipeline."""
