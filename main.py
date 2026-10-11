@@ -47,6 +47,8 @@ class EmoSetupApp(App):
         run_requested_self_test(self.settings_path, self.secret_store, self._write_settings)
 
         root = BoxLayout(orientation="vertical", padding=18, spacing=10)
+        root.size_hint_y = None
+        root.bind(minimum_height=root.setter("height"))
         root.add_widget(Label(
             text="[b]G-EMO[/b] — Setup",
             markup=True, font_size="25sp", color=BLUE,
@@ -102,7 +104,8 @@ class EmoSetupApp(App):
         root.add_widget(clear_button)
         root.add_widget(Label(
             text="Credentials are encrypted with AES-256-GCM using a key held by Android Keystore. If secure storage is unavailable, saving credentials is blocked; no plaintext fallback is used.",
-            color=GRAY, halign="left", valign="middle"
+            color=GRAY, halign="left", valign="middle",
+            size_hint_y=None, height="72dp"
         ))
         scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
         scroll.add_widget(root)
