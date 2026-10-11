@@ -1,5 +1,15 @@
 {
-  "whatsapp": {"enabled": true, "mode": "human", "monitor": false},
+  "whatsapp": {
+    "enabled": true,
+    "mode": "human",
+    "transport": "human",
+    "phone_number_id": "",
+    "access_token": "",
+    "api_version": "v22.0",
+    "webjs_endpoint": "",
+    "webjs_token": "",
+    "monitor": false
+  },
   "facebook": {"enabled": true, "mode": "human", "monitor": false},
   "telegram": {"enabled": false, "mode": "human", "monitor": false},
   "canva": {"enabled": true, "mode": "human", "monitor": false},
