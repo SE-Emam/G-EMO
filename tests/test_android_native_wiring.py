@@ -35,6 +35,16 @@ class AndroidNativeWiringTests(unittest.TestCase):
         metadata = service.find("meta-data")
         self.assertEqual(metadata.attrib[ANDROID_NS + "resource"], "@xml/gemo_accessibility_service")
 
+    def test_permission_center_is_user_mediated_and_reports_unknown_state(self):
+        main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+        self.assertIn("def check_accessibility_status", main_source)
+        self.assertIn("getServiceInfo(component, 0)", main_source)
+        self.assertIn("ACTION REQUIRED", main_source)
+        self.assertIn("CHECK FAILED", main_source)
+        self.assertIn("ACTION_ACCESSIBILITY_SETTINGS", main_source)
+        self.assertIn("the user must explicitly enable the service", main_source)
+        self.assertIn("ScrollView", main_source)
+
     def test_java_service_uses_explicit_prefix_and_package_allowlist(self):
         source = (ROOT / "android/src/com/emam/emo/GeminiAccessibilityService.java").read_text(encoding="utf-8")
         self.assertIn('GEMINI_PACKAGE = "com.google.android.apps.bard"', source)
