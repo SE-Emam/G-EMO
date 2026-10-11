@@ -16,6 +16,7 @@ from kivy.uix.spinner import Spinner
 from kivy.utils import get_color_from_hex
 
 from core.secure_storage import AndroidKeystoreTokenStore, SecureStorageError
+from core.android_keystore_smoke import run_requested_self_test
 from plugins.whatsapp_plugin import WhatsAppPlugin
 
 
@@ -41,6 +42,8 @@ class EmoSetupApp(App):
         self._secure_storage_error = ""
         self._initialize_secure_storage()
         self.settings = self._load_settings()
+        # Only runs when an explicit private marker is placed in app data (emulator CI).
+        run_requested_self_test(self.settings_path, self.secret_store, self._write_settings)
 
         root = BoxLayout(orientation="vertical", padding=18, spacing=10)
         root.add_widget(Label(
