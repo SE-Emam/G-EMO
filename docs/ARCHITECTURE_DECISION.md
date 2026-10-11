@@ -26,6 +26,34 @@ The prior `PROVIDER_ARCHITECTURE.md` record documents:
 
 These are historical records from the project document, not fresh live tests performed in this repository session.
 
+## Historical acceptance matrix (recorded 2026-10-01)
+
+| Criterion | Recorded status | Evidence / limitation |
+|---|---|---|
+| AC-01 Google authentication | PASS | Live Credential Manager/OAuth proof flow. |
+| AC-02 officially supported mechanism | PASS | AuthorizationClient + Credential Manager; no undocumented API, scraping, WebView, or Android loopback. |
+| AC-03 no EMO-owned/shared Gemini key | PASS | User-owned OAuth only; secret sweeps recorded zero credential material. |
+| AC-04 default only after verification | PASS-mechanism | Verification gate rejects proof-less, mismatched, incapable, or unattributed records; default requires CONNECTED. |
+| AC-05 real agent session after onboarding | PARTIAL | Isolated shell session was live; runtime-gateway Gemini session was not fully wired in the frozen core. |
+| AC-06 external provider support | PARTIAL | Coexistence/switching mechanism with KiosAPI tested; catalog/add-flow UX not complete. |
+| AC-07 model selection | PASS | Live model discovery plus capability gate. |
+| AC-08 provider switching | PASS-mechanism | Validated-target flip; sibling provider rows remain untouched. |
+| AC-09 per-user isolation | PASS | Owner-enforced store denies cross-user Get/List/Delete. |
+| AC-10 no credentials in logs/docs/analytics/Git | PASS | Redaction/refusal tests and secret sweeps recorded. |
+| AC-11 no automatic billing | PASS | No billing API; project attribution header is not a billing action. |
+| AC-12 disconnect without side effects | PASS-mechanism | Revoke/purge and owner-scoped deletion tested; product button depends on shell integration. |
+| AC-13 native adapter uses user OAuth | PASS | Live adapter test used the user token through native REST. |
+| AC-14 thought_signature regression | PASS | Key preservation and verbatim echo tested. |
+| AC-15 scrub boundary | PASS | Payloads preserved verbatim; only logs are scrubbed. |
+| AC-16 KiosAPI R-KIOS-01..04 | PASS | Factory, device default/runtime, live pong/stop, and regression recorded. |
+
+## Historical Step 7 residuals
+
+- **Runtime:** request formation and tool-loop behavior were proven. Final live state reached Gemini HTTP 429 QUOTA-EXCEEDED; no billing action was taken.
+- **App shell:** the FUI onboarding/bridge flow was reported live in a separate local branch: Welcome → Google auth → Gemini authorization → verification/model selection → CONNECTED → setDefault; switch-back to KiosAPI was also recorded.
+- **Web binary:** BLOCKED by upstream duplicate `semver@7.8.5` during frontend install. Required action is upstream lockfile correction, then `make build-launcher-android-arm64`, restage, and rebuild APK. Local lockfile hacks are prohibited.
+- **IAM:** the project-attribution header was required; after IAM propagation, identical requests eventually succeeded before quota exhaustion. Do not change scopes or enable billing as a workaround.
+
 ## Current repository evidence
 
 The current `SE-Emam/G-EMO` repository contains the uploaded `EMO-FINAL-PRODUCTION.zip` (249,171 bytes), a short README, and audit/docs added in this PR. The archive contains 13 Python files but does not include:
@@ -35,11 +63,11 @@ The current `SE-Emam/G-EMO` repository contains the uploaded `EMO-FINAL-PRODUCTI
 - the FUI branch and its `EmoAuthBridge`/onboarding additions;
 - the prior test harness and runtime proof artifacts.
 
-The archive's `uiautomator2`/Buildozer prototype is not a substitute for the approved architecture. Replacing it with an AccessibilityService that scrapes Gemini UI would violate the explicit no-scraping constraint and would bypass the existing OAuth/provider/runtime work.
+The archive's `uiautomator2`/Buildozer prototype is not a substitute for the approved architecture. Replacing it with an AccessibilityService that scrapes Gemini UI would violate the explicit no-scraping constraint and bypass the existing OAuth/provider/runtime work.
 
 ## Required next gate
 
-**Do not merge an invented replacement implementation.** Restore or upload the complete source from the approved working branches, then:
+**Do not merge an invented replacement implementation.** Restore or upload the complete approved source from the `emo/`, PicoClaw, and FUI working branches, then:
 
 1. Verify exact commit identities and clean worktrees for PicoClaw, FUI, and `emo/`.
 2. Confirm the existing adapter and tests are byte-identical to the previously validated implementation.
