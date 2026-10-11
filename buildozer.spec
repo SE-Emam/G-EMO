@@ -8,6 +8,7 @@ version = 1.0.0
 requirements = python3,kivy
 android.add_src = android/src
 android.res_xml = android/res/xml/gemo_accessibility_service.xml
+android.extra_manifest_application_arguments = android/extra_manifest_application_arguments.xml
 p4a.branch = develop
 p4a.commit = d2ee8c5
 orientation = portrait
