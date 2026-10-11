@@ -99,6 +99,52 @@ class WhatsAppPluginTests(unittest.TestCase):
         self.assertEqual(executor.execute(command)["status"], "CONFIRMATION_REQUIRED")
         self.assertEqual(executor.execute(command, confirmed=True)["status"], "HUMAN_ACTION_REQUIRED")
 
+    def test_webjs_rejects_plain_http_remote_endpoint_without_network(self):
+        plugin = self.configure({"transport": "webjs", "webjs_endpoint": "http://192.0.2.10:8787", "webjs_token": "bridge-test-token"})
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+            result = plugin.test_connection()
+        self.assertEqual(result["status"], "HUMAN_FALLBACK")
+        mocked.assert_not_called()
+
+    def test_webjs_rejects_url_with_embedded_credentials(self):
+        plugin = self.configure({"transport": "webjs", "webjs_endpoint": "http://user:pass@127.0.0.1:8787", "webjs_token": "bridge-test-token"})
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+            result = plugin.test_connection()
+        self.assertEqual(result["status"], "HUMAN_FALLBACK")
+        mocked.assert_not_called()
+
+    def test_cloud_api_rejects_invalid_recipient_without_network(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token"})
+        for recipient in ("abc", "+201234", "201234567890123456", "2012 34567890"):
+            with self.subTest(recipient=recipient):
+                with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+                    result = plugin.execute({"phone": recipient, "text": "Hello"}, confirmed=True)
+                self.assertEqual(result["status"], "INVALID_REQUEST")
+                mocked.assert_not_called()
+
+    def test_cloud_api_rejects_oversized_message_without_network(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token"})
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+            result = plugin.execute({"phone": "201000000000", "text": "x" * 4097}, confirmed=True)
+        self.assertEqual(result["status"], "INVALID_REQUEST")
+        mocked.assert_not_called()
+
+    def test_cloud_api_rejects_invalid_api_version_without_network(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token", "api_version": "v22.0/../../evil"})
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen") as mocked:
+            result = plugin.execute({"phone": "201000000000", "text": "Hello"}, confirmed=True)
+        self.assertEqual(result["status"], "INVALID_REQUEST")
+        mocked.assert_not_called()
+
+    def test_cloud_api_does_not_expose_provider_error_body(self):
+        plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token"})
+        import urllib.error
+        secret_detail = b'{"error":{"message":"sensitive provider detail"}}'
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen", side_effect=urllib.error.HTTPError("https://graph.facebook.com", 401, "Unauthorized", {}, io.BytesIO(secret_detail))):
+            result = plugin.execute({"phone": "201000000000", "text": "Hello"}, confirmed=True)
+        self.assertEqual(result["status"], "SEND_FAILED")
+        self.assertNotIn("sensitive provider detail", str(result))
+
 
 if __name__ == "__main__":
     unittest.main()
