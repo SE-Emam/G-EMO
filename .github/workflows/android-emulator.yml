@@ -73,14 +73,29 @@ jobs:
             fi
             adb install "$APK"
             adb shell monkey -p com.emam.emo 1
-            sleep 20
+            sleep 12
             adb shell pidof com.emam.emo
+            # Private marker opts into a three-launch test using dummy-only credentials.
+            adb shell run-as com.emam.emo sh -c 'P="$(find . -name settings.json -print -quit)"; test -n "$P"; touch "$(dirname "$P")/.gemo_android_keystore_self_test"'
+            for phase in 1 2 3; do
+              adb shell am force-stop com.emam.emo
+              adb shell monkey -p com.emam.emo 1
+              sleep 12
+              adb shell pidof com.emam.emo
+            done
+            adb shell run-as com.emam.emo sh -c 'P="$(find . -name .gemo_android_keystore_self_test.json -print -quit)"; test -n "$P"; cat "$P"' > android-keystore-self-test.json
+            grep -q '"status": "PASS"' android-keystore-self-test.json
+            adb shell run-as com.emam.emo sh -c 'P="$(find . -name settings.json -print -quit)"; test -n "$P"; cat "$P"' > android-runtime-settings.json
+            if grep -E '"(access_token|webjs_token)"[[:space:]]*:' android-runtime-settings.json; then
+              echo "FAIL: legacy plaintext token field found in runtime settings"
+              exit 1
+            fi
             adb logcat -d > android-emulator-logcat.txt
             if grep -E 'FATAL EXCEPTION|Python traceback|Traceback \(most recent call last\)' android-emulator-logcat.txt; then
               echo "FAIL: application startup error found in logcat"
               exit 1
             fi
-            echo "PASS: APK installed and app process remained running in Android Emulator."
+            echo "PASS: APK launch, Keystore round-trip, restart persistence, deletion, legacy migration, and plaintext settings inspection."
       - name: Upload emulator logcat
         if: always()
         uses: actions/upload-artifact@v4
