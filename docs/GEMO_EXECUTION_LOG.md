@@ -53,7 +53,17 @@ Python CI run `38183098643` reported `python-tests: success` after the syntax co
 
 **Critical blocker:** the Buildozer packaging configuration has not been updated. The attempted configuration write was blocked by a tool safety gate. Consequently, these Java/XML files are not proven to be present in the APK; no Android integration claim is justified.
 
-## Task 4 — Documentation and release gate
+## Task 4 — Approval broker
+
+**Status: IMPLEMENTED IN ISOLATION; NOT UI-INTEGRATED.**
+
+File: `core/approval_broker.py`; tests: `tests/test_approval_broker.py`.
+
+The broker holds exact pending commands in memory, lists only request/action metadata, expires approvals, and consumes an approval token before calling the executor. It is not yet wired into the Kivy UI or the native inbox pipeline, so it must not be described as a working user approval flow.
+
+Commit: `56ea13e458618f9b9dd4f4348ec87bd0fbe9b0bd`.
+
+## Task 5 — Documentation and release gate
 
 **Status: DOCUMENTED; enforcement incomplete.**
 
@@ -68,7 +78,8 @@ Python CI run `38183098643` reported `python-tests: success` after the syntax co
 5. Run Python CI, Android build CI, emulator lifecycle/permission tests, and inspect logs/artifacts.
 6. Verify actual command flow on an Android emulator and at least one physical device.
 7. Fix the reported app startup/disappearing issue from actual crash evidence.
-8. Run a final repository audit and publish a status matrix backed by test results.
+8. Enforce skill execution timeouts/cancellation at the handler boundary; `timeout_seconds` is currently declarative metadata, not a hard runtime timeout.
+9. Run a final repository audit and publish a status matrix backed by test results.
 
 ## Release decision
 
