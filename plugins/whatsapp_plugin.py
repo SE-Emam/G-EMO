@@ -11,6 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from core.secure_storage import AndroidKeystoreTokenStore, EnvironmentSecretStore, SecureStorageError, SecretStore
+
 
 _API_VERSION = re.compile(r"^v[0-9]{1,3}\.[0-9]{1,2}$")
 _PHONE = re.compile(r"^\+?[0-9]{8,15}$")
@@ -18,9 +20,26 @@ _MAX_MESSAGE_CHARS = 4096
 
 
 class WhatsAppPlugin:
-    def __init__(self, settings_path: str | Path = "config/settings.json", timeout: float = 12.0) -> None:
+    def __init__(self, settings_path: str | Path = "config/settings.json", timeout: float = 12.0, secret_store: SecretStore | None = None) -> None:
         self.settings_path = Path(settings_path)
         self.timeout = max(1.0, min(float(timeout), 30.0))
+        self._provided_secret_store = secret_store
+        self._secret_store = None
+
+    def _secrets(self) -> SecretStore:
+        if self._provided_secret_store is not None:
+            return self._provided_secret_store
+        if self._secret_store is None:
+            try:
+                self._secret_store = AndroidKeystoreTokenStore()
+            except SecureStorageError:
+                # Environment variables are an explicit development/deployment override;
+                # credentials are never read from the JSON settings file.
+                self._secret_store = EnvironmentSecretStore()
+        return self._secret_store
+
+    def _secret(self, name: str) -> str:
+        return self._secrets().get(name)
 
     def _config(self) -> dict[str, Any]:
         try:
@@ -80,7 +99,7 @@ class WhatsAppPlugin:
             return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "Human mode is selected; no API connection is required"}
         if transport == "webjs":
             url = self._webjs_url(config.get("webjs_endpoint"), "/health")
-            bridge_token = os.getenv("G_EMO_WHATSAPP_WEBJS_TOKEN") or config.get("webjs_token")
+            bridge_token = self._secret("whatsapp_webjs_token")
             if not url or not bridge_token:
                 return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "Bridge URL must be loopback HTTP or remote HTTPS; bridge credentials are required"}
             request = urllib.request.Request(url, headers={"Authorization": f"Bearer {bridge_token}"}, method="GET")
@@ -94,7 +113,7 @@ class WhatsAppPlugin:
                 return {"status": "CONNECTION_FAILED", "plugin": "whatsapp", "detail": "Bridge connection failed; verify the endpoint and bridge logs"}
         if transport != "cloud_api":
             return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "Unknown transport; human mode is the safe fallback"}
-        token = os.getenv("G_EMO_WHATSAPP_ACCESS_TOKEN") or config.get("access_token")
+        token = self._secret("whatsapp_access_token")
         phone_id = config.get("phone_number_id")
         version = self._api_version(config)
         if not token or not phone_id or not version or not re.fullmatch(r"[0-9]{1,32}", str(phone_id)):
@@ -143,7 +162,7 @@ class WhatsAppPlugin:
 
     def _send_webjs(self, command: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
         url = self._webjs_url(config.get("webjs_endpoint"), "/send")
-        bridge_token = os.getenv("G_EMO_WHATSAPP_WEBJS_TOKEN") or config.get("webjs_token")
+        bridge_token = self._secret("whatsapp_webjs_token")
         if not url or not bridge_token:
             return self.send_human(command, "Bridge URL or credentials are invalid; use WhatsApp manually")
         recipient = command.get("phone") or command.get("to_phone")
@@ -165,7 +184,7 @@ class WhatsAppPlugin:
         if not confirmed:
             return {"status": "CONFIRMATION_REQUIRED", "plugin": "whatsapp"}
         config = self._config()
-        token = os.getenv("G_EMO_WHATSAPP_ACCESS_TOKEN") or config.get("access_token")
+        token = self._secret("whatsapp_access_token")
         transport = str(config.get("transport") or command.get("mode") or "human").lower()
         if transport == "cloud_api":
             if not token or not config.get("phone_number_id"):
