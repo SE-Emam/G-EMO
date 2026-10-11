@@ -16,6 +16,8 @@ jobs:
           python-version: '3.11'
       - name: Validate settings JSON
         run: python -m json.tool config/settings.json >/dev/null
+      - name: Compile Python entry points
+        run: python -m py_compile main.py plugins/whatsapp_plugin.py
       - name: Run Python unit tests
         run: python -m unittest discover -v
   webjs-bridge-static-check:
