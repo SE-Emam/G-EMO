@@ -59,7 +59,7 @@ class NativeInboxTests(unittest.TestCase):
         self.assertTrue((self.root / "pending.tmp").exists())
 
     def test_unknown_fields_do_not_change_action(self):
-        self.write("extra", "unexpected" if False else request_id="extra")
+        self.write("extra", unexpected="ignored")
         result = consume_inbox(self.root, now_ms=self.now)
         self.assertEqual(result[0]["command"]["action"], "send_whatsapp")
 
