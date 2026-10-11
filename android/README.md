@@ -28,9 +28,11 @@ The repository now contains an initial native service source and XML declaration
 
 ## Status
 
-- Native Java service source: **IMPLEMENTED, NOT BUILD-VERIFIED**.
-- Service metadata and manifest fragment: **ADDED, NOT MERGED-MANIFEST-VERIFIED**.
-- Buildozer packaging configuration: **BLOCKED / NOT UPDATED**.
+- Native Java service source: **IMPLEMENTED, BUILD VERIFICATION PENDING**.
+- Service metadata and manifest fragment: **ADDED, MERGED-MANIFEST VERIFICATION PENDING**.
+- Buildozer packaging configuration: **CONFIGURED; CI BUILD VERIFICATION PENDING**.
+- In-app permission status/settings controls: **IMPLEMENTED IN UI; Android runtime verification pending**.
+- Permission state labels distinguish service not packaged, action required, granted, and check failed; the UI opens system settings but does not grant permission.
 - Python inbox validator: **IMPLEMENTED; CI verification pending**.
 - Gemini-to-skill end-to-end execution: **NOT IMPLEMENTED / NOT VERIFIED**.
 
