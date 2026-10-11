@@ -46,6 +46,18 @@ class WhatsAppPluginTests(unittest.TestCase):
         self.assertEqual(result["status"], "CONNECTED")
         self.assertEqual(result["display_phone_number"], "+201000000000")
 
+    def test_webjs_connection_check_reports_connected(self):
+        plugin = self.configure({"transport": "webjs", "webjs_endpoint": "http://127.0.0.1:8787", "webjs_token": "bridge-test-token"})
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return b'{"status":"CONNECTED"}'
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen", return_value=Response()):
+            result = plugin.test_connection()
+        self.assertEqual(result["status"], "CONNECTED")
+        self.assertEqual(result["transport"], "webjs")
+
     def test_webjs_without_bridge_falls_back_to_human(self):
         plugin = self.configure({"transport": "webjs", "webjs_endpoint": "", "webjs_token": ""})
         result = plugin.execute({"to_phone": "201000000000", "text": "Hello"}, confirmed=True)
