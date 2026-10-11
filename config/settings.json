@@ -1,0 +1,8 @@
+{
+  "whatsapp": {"enabled": true, "mode": "human", "monitor": false},
+  "facebook": {"enabled": true, "mode": "human", "monitor": false},
+  "telegram": {"enabled": false, "mode": "human", "monitor": false},
+  "canva": {"enabled": true, "mode": "human", "monitor": false},
+  "drive": {"enabled": true, "mode": "human", "monitor": false},
+  "email": {"enabled": false, "mode": "human", "monitor": false}
+}
