@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import os
 import re
 import urllib.error
 import urllib.parse
@@ -39,7 +38,11 @@ class WhatsAppPlugin:
         return self._secret_store
 
     def _secret(self, name: str) -> str:
-        return self._secrets().get(name)
+        try:
+            return self._secrets().get(name)
+        except SecureStorageError:
+            # Fail closed: never read JSON credentials or crash a background UI worker.
+            return ""
 
     def _config(self) -> dict[str, Any]:
         try:
