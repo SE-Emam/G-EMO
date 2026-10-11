@@ -56,6 +56,24 @@ class EmoSetupApp(App):
             halign="left", valign="middle", color=DARK,
             size_hint_y=None, height="54dp"
         ))
+        self.accessibility_status = Label(
+            text="Gemini bridge status: checking Android service and opt-in…",
+            color=GRAY, halign="left", valign="middle",
+            size_hint_y=None, height="48dp"
+        )
+        root.add_widget(self.accessibility_status)
+        permission_check = Button(
+            text="Check Gemini Accessibility Status",
+            size_hint_y=None, height="44dp", background_normal="", background_color=BLUE
+        )
+        permission_check.bind(on_press=self.check_accessibility_status)
+        root.add_widget(permission_check)
+        permission_settings = Button(
+            text="Open Android Accessibility Settings",
+            size_hint_y=None, height="44dp", background_normal="", background_color=BLUE
+        )
+        permission_settings.bind(on_press=self.open_accessibility_settings)
+        root.add_widget(permission_settings)
         root.add_widget(Label(text="WhatsApp transport", color=DARK, size_hint_y=None, height="24dp", halign="left"))
         self.transport = Spinner(
             text=self.settings.get("whatsapp", {}).get("transport", "human"),
@@ -85,6 +103,67 @@ class EmoSetupApp(App):
             color=GRAY, halign="left", valign="middle"
         ))
         return root
+
+    def check_accessibility_status(self, *_):
+        """Report actual Android service/opt-in state; never grant it automatically."""
+        try:
+            from jnius import autoclass
+            activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            component = autoclass("android.content.ComponentName")(
+                activity, "com.emam.emo.GeminiAccessibilityService"
+            )
+            try:
+                activity.getPackageManager().getServiceInfo(component, 0)
+            except Exception:
+                self.accessibility_status.text = (
+                    "BLOCKED — native Gemini service is not registered in this installed APK."
+                )
+                return "NOT_PACKAGED"
+            secure_settings = autoclass("android.provider.Settings$Secure")
+            enabled = secure_settings.getString(
+                activity.getContentResolver(),
+                secure_settings.ENABLED_ACCESSIBILITY_SERVICES
+            ) or ""
+            accepted = {
+                item.strip().lower()
+                for item in enabled.split(":")
+                if item.strip()
+            }
+            expected = {
+                "com.emam.emo/com.emam.emo.geminiaccessibilityservice",
+                "com.emam.emo/.geminiaccessibilityservice",
+            }
+            if accepted.intersection(expected):
+                self.accessibility_status.text = (
+                    "GRANTED — G-EMO Accessibility Service is enabled. Command flow is not yet end-to-end verified."
+                )
+                return "GRANTED"
+            self.accessibility_status.text = (
+                "ACTION REQUIRED — enable G-EMO manually in Android Accessibility Settings."
+            )
+            return "ACTION_REQUIRED"
+        except Exception:
+            self.accessibility_status.text = (
+                "CHECK FAILED — Android permission state could not be read on this runtime."
+            )
+            return "CHECK_FAILED"
+
+    def open_accessibility_settings(self, *_):
+        """Open system settings only; the user must explicitly enable the service."""
+        try:
+            from jnius import autoclass
+            activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            intent_class = autoclass("android.content.Intent")
+            settings_class = autoclass("android.provider.Settings")
+            activity.startActivity(
+                intent_class(settings_class.ACTION_ACCESSIBILITY_SETTINGS)
+            )
+            return True
+        except Exception:
+            self.accessibility_status.text = (
+                "UNAVAILABLE — could not open Android Accessibility Settings on this runtime."
+            )
+            return False
 
     def _initial_status(self):
         if self._secure_storage_error:
