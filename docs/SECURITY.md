@@ -1,28 +1,32 @@
 # G-EMO Security Notes
 
-## Current controls
+## Credential protection implemented on this branch
 
-- WhatsApp sends require an explicit executor confirmation.
-- Human mode is the default; missing credentials do not trigger a network request.
-- Cloud API versions and phone-number IDs are validated before URL construction.
-- Recipients and message size are validated before a send request.
-- Provider error bodies are not returned to the caller.
-- The optional bridge requires a bearer token, caps request bodies, defaults to loopback binding, and rejects non-loopback binding unless explicitly overridden.
-- The Python client permits plain HTTP bridge URLs only for loopback hosts; remote bridge endpoints must use HTTPS.
-- Automated regression tests cover these controls.
+- core/secure_storage.py uses Android Keystore to hold an AES-256-GCM encryption key; only the IV and ciphertext are stored in app-private SharedPreferences.
+- Provider credentials are no longer read from or written to settings.json by the production WhatsApp adapter.
+- The setup UI never pre-populates secret fields with saved credentials. It offers explicit credential deletion.
+- The app attempts a one-time migration of legacy plaintext tokens to encrypted storage. It removes legacy token fields from settings JSON even if migration cannot encrypt them; in that failure case the old token is discarded and must be entered again after secure storage becomes available.
+- If Android Keystore is unavailable, the UI blocks saving entered credentials. There is no plaintext-file fallback.
+- Environment variables remain an explicit deployment override for controlled environments; they are not written to settings files.
+- WhatsApp sends require explicit executor confirmation; human mode is the default.
+- API versions, phone-number IDs, recipients, and message sizes are validated before requests.
+- Provider error bodies are not returned to callers.
+- The optional bridge requires bearer authentication, caps request bodies, defaults to loopback binding, and the Python client rejects plain HTTP for remote bridge URLs.
 
-## Production blockers — do not treat this branch as production-ready
+## Verification still required
 
-1. **Android Keystore-backed secret storage is not implemented.** The current Kivy screen persists access tokens in app-private JSON. App-private storage is not equivalent to encryption at rest. Do not use a long-lived production token in this build.
-2. **Native Android AccessibilityService is not implemented or device-tested.** No accessibility-driven action should be represented as verified.
-3. **APK signing, install, and real-device tests are not verified.**
-4. **The unofficial whatsapp-web.js bridge is not security-equivalent to Meta Cloud API.** Its browser session is sensitive account access; keep it on loopback or behind authenticated HTTPS, never expose it directly to the public internet. The Puppeteer/Termux runtime has not been validated on-device.
-5. **Live Meta credentials and live message delivery have not been tested.** CI mocks network responses; it does not prove provider-side permissions or delivery.
+1. **Android runtime verification is pending.** CI cannot prove Pyjnius/Android Keystore interoperability, AES-GCM encrypt/decrypt, or persistence across app restarts. These require a real Android build and device/emulator test.
+2. **Key lifecycle needs device tests.** Test create, encrypt/decrypt, update, delete, app restart, app-data restore behavior, and recovery when the Keystore key is invalidated or unavailable.
+3. **Legacy migration must be exercised on Android.** Confirm plaintext access_token and webjs_token fields are removed after migration; when Keystore is unavailable, verify no secret remains in settings JSON.
+4. **Native Android AccessibilityService is not implemented or device-tested.**
+5. **APK signing, install, and real-device tests are not verified.**
+6. **The unofficial whatsapp-web.js bridge is not security-equivalent to Meta Cloud API.** Its browser session is sensitive account access; keep it on loopback or behind authenticated HTTPS, never expose it directly to the public internet. Puppeteer/Termux compatibility has not been validated on-device.
+7. **Live Meta credentials and message delivery have not been tested.** CI uses mocked provider responses.
 
-## Required release gates
+## Release gates
 
-- Implement and test a native Android Keystore-backed token provider; never silently fall back to plaintext token persistence.
-- Add Android instrumentation/device tests for secret persistence, app restart, logout/token clearing, accessibility permissions, and confirmation behavior.
-- Run the complete CI suite on the final PR head and inspect the job logs.
-- Test Meta connection using a dedicated test account and verify an actual controlled delivery only with explicit operator consent.
-- Keep the PR in draft until each blocker has evidence attached.
+- Build/install the APK on a supported Android device and run Keystore encrypt/decrypt/migration/deletion tests.
+- Inspect app-private settings JSON and verify it contains no provider token fields or token values.
+- Run the full CI suite on the final PR head and inspect each job result.
+- Test Meta connection with a dedicated test account; perform a controlled live delivery only with explicit operator consent.
+- Keep the PR in draft until the Android verification gates pass.
