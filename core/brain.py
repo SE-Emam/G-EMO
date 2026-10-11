@@ -1,7 +1,7 @@
 """Strict, deterministic command parsing for G-EMO.
 
 This module intentionally does not call a model or infer missing recipients/content.
-""" 
+"""
 from __future__ import annotations
 
 import re
@@ -29,27 +29,23 @@ class ParseError(ValueError):
 
 
 def parse_command(raw_text: str) -> dict[str, Any]:
-    """Parse a small, explicit Arabic/English command set; reject ambiguity.
-
-    This is a safe baseline parser, not natural-language understanding. It only
-    accepts a small set of unambiguous forms and never invents a recipient.
-    """
+    """Parse a small, explicit Arabic command set; reject ambiguity."""
     if not isinstance(raw_text, str):
         raise ParseError("Command must be text")
     text = " ".join(raw_text.strip().split())
     if not text or len(text) > 4000:
         raise ParseError("Command is empty or too long")
-
-    # Require an explicit EMO prefix to avoid interpreting ordinary Gemini replies.
     if not re.match(r"^(?:يا\s+)?emo\b|^(?:يا\s+)?إيمو\b", text, re.IGNORECASE):
         raise ParseError("Missing explicit EMO command prefix")
     body = re.sub(r"^(?:(?:يا\s+)?emo|(?:يا\s+)?إيمو)\s*[,،:：-]?\s*", "", text, flags=re.IGNORECASE).strip()
 
+    # Arabic prepositions include لِـ, لأحمد, and إليه forms; preserve recipient text.
+    recipient_prefix = r"(?:لـ|لأ|لل|ل|إلى|الى)"
     patterns = [
-        (r"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+(?:لـ|ل|إلى|الى)\s+([^:：]+)\s*[:：]\s*(.+)$", "send_whatsapp"),
-        (r"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+(?:لـ|ل|إلى|الى)\s+(.+?)\s+(?:رسالة|بيقول|نصها)\s+(.+)$", "send_whatsapp"),
+        (rf"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+{recipient_prefix}\s*([^:：]+)\s*[:：]\s*(.+)$", "send_whatsapp"),
+        (rf"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+{recipient_prefix}\s*(.+?)\s+(?:رسالة|بيقول|نصها)\s+(.+)$", "send_whatsapp"),
         (r"^(?:انشر|انشرلي|انشر لي)\s+(?:على|علي)\s+فيسبوك\s*[:：]?\s*(.+)$", "post_facebook"),
-        (r"^(?:ابعت|أرسل|ارسل)\s+تيليجرام\s+(?:لـ|ل|إلى|الى)\s+([^:：]+)\s*[:：]\s*(.+)$", "send_telegram"),
+        (rf"^(?:ابعت|أرسل|ارسل)\s+تيليجرام\s+{recipient_prefix}\s*([^:：]+)\s*[:：]\s*(.+)$", "send_telegram"),
         (r"^(?:افتح|شغل)\s+كانفا$", "open_canva"),
         (r"^(?:ابحث|دور)\s+في\s+درايف\s+عن\s+(.+)$", "search_drive"),
     ]
@@ -70,5 +66,4 @@ def parse_command(raw_text: str) -> dict[str, Any]:
         if action == "search_drive":
             return Command(action=action, query=groups[0]).to_dict()
         return Command(action=action).to_dict()
-
     raise ParseError("Unsupported or ambiguous command; no action was executed")
