@@ -1,4 +1,4 @@
-name: G-EMO Python tests
+name: G-EMO tests
 on:
   push:
     branches: [main, 'implementation/**']
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 jobs:
-  unit-tests:
+  python-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +16,19 @@ jobs:
           python-version: '3.11'
       - name: Validate settings JSON
         run: python -m json.tool config/settings.json >/dev/null
-      - name: Run unit tests
+      - name: Run Python unit tests
         run: python -m unittest discover -v
+  webjs-bridge-static-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/whatsapp-webjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate bridge JavaScript syntax
+        run: node --check server.js
+      - name: Validate bridge package JSON
+        run: node -e 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8"))'
