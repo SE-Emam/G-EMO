@@ -1,4 +1,5 @@
 import json
+import os
 import io
 import tempfile
 import unittest
@@ -169,6 +170,19 @@ class WhatsAppPluginTests(unittest.TestCase):
             result = plugin.execute({"phone": "201000000000", "text": "Hello"}, confirmed=True)
         self.assertEqual(result["status"], "SEND_FAILED")
         self.assertNotIn("sensitive provider detail", str(result))
+
+    def test_plugin_never_reads_plaintext_tokens_from_settings_without_secure_store(self):
+        self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "must-not-be-used"})
+        plugin = WhatsAppPlugin(self.path)
+        with patch("plugins.whatsapp_plugin.AndroidKeystoreTokenStore", side_effect=SecureStorageError("keystore unavailable")), patch.dict(os.environ, {"G_EMO_WHATSAPP_ACCESS_TOKEN": ""}):
+            result = plugin.execute({"phone": "201000000000", "text": "Hello"}, confirmed=True)
+        self.assertEqual(result["status"], "HUMAN_ACTION_REQUIRED")
+
+    def test_test_secret_store_adapter_is_explicitly_injected(self):
+        adapter = TestSettingsSecretStore(self.path)
+        self.path.write_text(json.dumps({"whatsapp": {"access_token": "test-only-secret"}}), encoding="utf-8")
+        self.assertEqual(adapter.get("whatsapp_access_token"), "test-only-secret")
+        # This is a test-only fixture; production plugin defaults never read secrets from JSON.
 
 
 if __name__ == "__main__":
