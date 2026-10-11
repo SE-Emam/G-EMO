@@ -116,8 +116,8 @@ class WhatsAppPlugin:
         token = os.getenv("G_EMO_WHATSAPP_ACCESS_TOKEN") or config.get("access_token")
         transport = str(config.get("transport") or command.get("mode") or "human").lower()
         if transport == "cloud_api":
-            if not token:
-                return self.send_human(command, "No Cloud API access token; automatically falling back to human mode")
+            if not token or not config.get("phone_number_id"):
+                return self.send_human(command, "Cloud API credentials incomplete; automatically falling back to human mode")
             return self._send_cloud_api(command, config, str(token))
         if transport == "webjs":
             return self._send_webjs(command, config)
