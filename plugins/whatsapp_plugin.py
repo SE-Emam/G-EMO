@@ -1,4 +1,4 @@
-""""WhatsApp adapter with conservative transport validation and human fallback."""
+"""WhatsApp adapter with conservative transport validation and human fallback."""
 from __future__ import annotations
 
 import ipaddress
@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 
-_API_VERSION = re.compile(r"^v[0-9]{1,3}\\.[0-9]{1,2}$")
-_PHONE = re.compile(r"^\\+?[0-9]{8,15}$")
+_API_VERSION = re.compile(r"^v[0-9]{1,3}\.[0-9]{1,2}$")
+_PHONE = re.compile(r"^\+?[0-9]{8,15}$")
 _MAX_MESSAGE_CHARS = 4096
 
 
@@ -137,7 +137,6 @@ class WhatsAppPlugin:
                     return {"status": "SENT", "plugin": "whatsapp", "transport": "cloud_api", "http_status": 200, "message_id": message_id}
                 return {"status": "SEND_FAILED", "plugin": "whatsapp", "http_status": response.status, "detail": "Meta did not confirm message acceptance"}
         except urllib.error.HTTPError as exc:
-            # Never return raw provider error bodies, which may contain private metadata.
             return {"status": "SEND_FAILED", "plugin": "whatsapp", "http_status": exc.code, "detail": "Meta Graph API rejected the request"}
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError):
             return {"status": "SEND_FAILED", "plugin": "whatsapp", "detail": "Meta request failed; check network and provider logs"}
