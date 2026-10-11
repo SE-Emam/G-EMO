@@ -15,7 +15,7 @@
 
 ## Verification still required
 
-1. **Android runtime verification is pending.** CI cannot prove Pyjnius/Android Keystore interoperability, AES-GCM encrypt/decrypt, or persistence across app restarts. These require a real Android build and device/emulator test.
+1. **Android runtime verification is automated but must pass on the current PR head.** `.github/workflows/android-emulator.yml` builds x86_64 and device APKs, installs the x86_64 APK in an Android 35 emulator, and uses a private one-shot marker to run the actual Pyjnius/Android Keystore path across app launches. The runtime gate checks AES-GCM round-trip, restart persistence, deletion, legacy token migration, and runtime settings JSON. A workflow definition is not evidence of success: inspect its run and artifacts before closing this gate.
 2. **Key lifecycle needs device tests.** Test create, encrypt/decrypt, update, delete, app restart, app-data restore behavior, and recovery when the Keystore key is invalidated or unavailable.
 3. **Legacy migration must be exercised on Android.** Confirm plaintext access_token and webjs_token fields are removed after migration; when Keystore is unavailable, verify no secret remains in settings JSON.
 4. **Native Android AccessibilityService is not implemented or device-tested.**
@@ -25,7 +25,8 @@
 
 ## Release gates
 
-- Build/install the APK on a supported Android device and run Keystore encrypt/decrypt/migration/deletion tests.
+- Require a passing `.github/workflows/android-emulator.yml` run on the final PR head; retain the Keystore self-test report, runtime settings inspection, and emulator logcat artifacts.
+- Build/install the APK on a supported physical Android device and repeat the Keystore encrypt/decrypt/migration/deletion tests before production release.
 - Inspect app-private settings JSON and verify it contains no provider token fields or token values.
 - Run the full CI suite on the final PR head and inspect each job result.
 - Test Meta connection with a dedicated test account; perform a controlled live delivery only with explicit operator consent.
