@@ -41,8 +41,27 @@ class WhatsAppPlugin:
         }
 
     def test_connection(self) -> dict[str, Any]:
-        """Validate Cloud API credentials without sending a message."""
+        """Check the selected transport without sending a message."""
         config = self._config()
+        transport = str(config.get("transport") or "human").lower()
+        if transport == "human":
+            return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "Human mode is selected; no API connection is required"}
+        if transport == "webjs":
+            endpoint = config.get("webjs_endpoint")
+            bridge_token = os.getenv("G_EMO_WHATSAPP_WEBJS_TOKEN") or config.get("webjs_token")
+            if not endpoint or not bridge_token:
+                return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "WhatsApp Web bridge credentials missing"}
+            request = urllib.request.Request(str(endpoint).rstrip("/") + "/health", headers={"Authorization": f"Bearer {bridge_token}"}, method="GET")
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                    if response.status == 200 and body.get("status") == "CONNECTED":
+                        return {"status": "CONNECTED", "plugin": "whatsapp", "transport": "webjs"}
+                    return {"status": "CONNECTION_FAILED", "plugin": "whatsapp", "http_status": response.status, "detail": body.get("status")}
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+                return {"status": "CONNECTION_FAILED", "plugin": "whatsapp", "detail": str(exc)}
+        if transport != "cloud_api":
+            return {"status": "HUMAN_FALLBACK", "plugin": "whatsapp", "detail": "Unknown transport; human mode is the safe fallback"}
         token = os.getenv("G_EMO_WHATSAPP_ACCESS_TOKEN") or config.get("access_token")
         phone_id = config.get("phone_number_id")
         if not token or not phone_id:
@@ -54,7 +73,7 @@ class WhatsAppPlugin:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = json.loads(response.read().decode("utf-8"))
                 if response.status == 200:
-                    return {"status": "CONNECTED", "plugin": "whatsapp", "phone_number_id": body.get("id"), "display_phone_number": body.get("display_phone_number")}
+                    return {"status": "CONNECTED", "plugin": "whatsapp", "transport": "cloud_api", "phone_number_id": body.get("id"), "display_phone_number": body.get("display_phone_number")}
                 return {"status": "CONNECTION_FAILED", "plugin": "whatsapp", "http_status": response.status}
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             return {"status": "CONNECTION_FAILED", "plugin": "whatsapp", "detail": str(exc)}
