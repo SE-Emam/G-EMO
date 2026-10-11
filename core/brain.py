@@ -40,7 +40,7 @@ def parse_command(raw_text: str) -> dict[str, Any]:
     body = re.sub(r"^(?:(?:يا\s+)?emo|(?:يا\s+)?إيمو)\s*[,،:：-]?\s*", "", text, flags=re.IGNORECASE).strip()
 
     # Arabic prepositions include لِـ, لأحمد, and إليه forms; preserve recipient text.
-    recipient_prefix = r"(?:لـ|لأ|لل|ل|إلى|الى)"
+    recipient_prefix = r"(?:لـ|ل|إلى|الى)"
     patterns = [
         (rf"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+{recipient_prefix}\s*([^:：]+)\s*[:：]\s*(.+)$", "send_whatsapp"),
         (rf"^(?:ابعت|أرسل|ارسل)\s+واتساب\s+{recipient_prefix}\s*(.+?)\s+(?:رسالة|بيقول|نصها)\s+(.+)$", "send_whatsapp"),
