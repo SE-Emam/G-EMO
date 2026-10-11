@@ -68,7 +68,7 @@ class EmoSetupApp(App):
         save_button = Button(text="Save WhatsApp Settings", size_hint_y=None, height="48dp", background_normal="", background_color=BLUE)
         save_button.bind(on_press=self.save_settings)
         root.add_widget(save_button)
-        test_button = Button(text="Test Cloud API Connection", size_hint_y=None, height="48dp", background_normal="", background_color=BLUE)
+        test_button = Button(text="Test Selected Connection", size_hint_y=None, height="48dp", background_normal="", background_color=BLUE)
         test_button.bind(on_press=self.test_connection)
         root.add_widget(test_button)
         root.add_widget(Label(
@@ -117,10 +117,10 @@ class EmoSetupApp(App):
 
     def test_connection(self, *_):
         settings = self.save_settings()
-        if settings["whatsapp"].get("transport") != "cloud_api":
-            self.status.text = "Select cloud_api to test Meta credentials. No message will be sent."
+        if settings["whatsapp"].get("transport") == "human":
+            self.status.text = "HUMAN MODE selected. No connection required and no message was sent."
             return
-        self.status.text = "Testing connection… no message will be sent."
+        self.status.text = "Testing selected connection… no message will be sent."
         def run_test():
             result = WhatsAppPlugin(self.settings_path).test_connection()
             Clock.schedule_once(lambda _dt: self._show_test_result(result), 0)
@@ -132,7 +132,7 @@ class EmoSetupApp(App):
             phone = result.get("display_phone_number") or result.get("phone_number_id") or ""
             self.status.text = f"CONNECTED — {phone}. Connection verified; no message was sent."
         elif status == "HUMAN_FALLBACK":
-            self.status.text = "HUMAN MODE — credentials missing. Use WhatsApp manually."
+            self.status.text = "HUMAN MODE — setup incomplete or manual transport selected. Use WhatsApp manually."
         else:
             self.status.text = f"CONNECTION FAILED — {result.get('http_status', '')} {result.get('detail', '')}"
 
