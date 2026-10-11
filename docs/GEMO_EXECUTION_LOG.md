@@ -51,7 +51,7 @@ Commits:
 
 Python CI run `38183098643` reported `python-tests: success` after the syntax correction in commit `a582a3070357d4a61c341c364bb2f60bc3660c48`.
 
-**Critical blocker:** the Buildozer packaging configuration has not been updated. The attempted configuration write was blocked by a tool safety gate. Consequently, these Java/XML files are not proven to be present in the APK; no Android integration claim is justified.
+**Packaging configuration: ADDED; build proof pending.** `buildozer.spec` now sets `android.add_src`, `android.res_xml`, and `android.extra_manifest_application_arguments`. It also pins python-for-android to the upstream fix commit `d2ee8c5` after CI logs showed the pip `BuildDependencyInstallError` import failure. These files are not proven to be present in a built APK until the current Android workflow passes and the merged manifest is inspected.
 
 ## Task 4 — Approval broker
 
@@ -63,7 +63,15 @@ The broker holds exact pending commands in memory, lists only request/action met
 
 Commit: `56ea13e458618f9b9dd4f4348ec87bd0fbe9b0bd`.
 
-## Task 5 — Documentation and release gate
+## Task 5 — Native packaging and static wiring tests
+
+**Status: CONFIGURED; CI BUILD PENDING.**
+
+`buildozer.spec` now wires the Java source directory, accessibility XML resource, and manifest application fragment. `tests/test_android_native_wiring.py` checks these settings, the service declaration, package allow-list, and disabled gesture/window-content capabilities. Commit: `2a461f4963abb620fd8da7c014582b68a3bf5a0f`.
+
+The previous build failure was traced from run `38140859056` to the python-for-android/pip `BuildDependencyInstallError` import. The upstream workaround documented in issue #3364 is pinned as `p4a.branch = develop` and `p4a.commit = d2ee8c5` (commit `994ebc48d7380d21e7ce11abe981526b1b0dc37e`). The current CI build has not yet returned a result.
+
+## Task 6 — Documentation and release gate
 
 **Status: DOCUMENTED; enforcement incomplete.**
 
@@ -71,10 +79,10 @@ Commit: `56ea13e458618f9b9dd4f4348ec87bd0fbe9b0bd`.
 
 ## Remaining tasks — all release-blocking
 
-1. Resolve the Buildozer configuration blocker through an authorized, reviewed change.
+1. Obtain a passing Android build with the pinned python-for-android fix; inspect the merged manifest and prove the Java class is packaged.
 2. Add an in-app permission center that accurately distinguishes service-not-packaged, permission-not-granted, permission-granted, and check-failed states; the app must never claim it can grant system permissions.
 3. Connect the native inbox consumer to the parser, skill registry, and existing plugin executor; enforce approvals before external side effects.
-4. Add static checks for the merged manifest and native class packaging.
+4. Add/complete merged-manifest and packaged-class inspection in CI; current tests only validate source files/configuration.
 5. Run Python CI, Android build CI, emulator lifecycle/permission tests, and inspect logs/artifacts.
 6. Verify actual command flow on an Android emulator and at least one physical device.
 7. Fix the reported app startup/disappearing issue from actual crash evidence.
