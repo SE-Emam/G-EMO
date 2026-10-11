@@ -6,6 +6,31 @@ from pathlib import Path
 from unittest.mock import patch
 from core.executor import Executor
 from plugins.whatsapp_plugin import WhatsAppPlugin
+from core.secure_storage import SecureStorageError
+
+
+class TestSettingsSecretStore:
+    """Test-only adapter: fixtures emulate secure secret lookup without Android."""
+    def __init__(self, path):
+        self.path = Path(path)
+        self.values = {}
+
+    def get(self, name):
+        if name in self.values:
+            return self.values[name]
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            whatsapp = data.get("whatsapp", {})
+            key = {"whatsapp_access_token": "access_token", "whatsapp_webjs_token": "webjs_token"}[name]
+            return whatsapp.get(key, "")
+        except (OSError, json.JSONDecodeError, KeyError):
+            return ""
+
+    def set(self, name, value):
+        self.values[name] = value
+
+    def delete(self, name):
+        self.values.pop(name, None)
 
 
 class WhatsAppPluginTests(unittest.TestCase):
@@ -19,7 +44,7 @@ class WhatsAppPluginTests(unittest.TestCase):
 
     def configure(self, config):
         self.path.write_text(json.dumps({"whatsapp": config}), encoding="utf-8")
-        return WhatsAppPlugin(self.path)
+        return WhatsAppPlugin(self.path, secret_store=TestSettingsSecretStore(self.path))
 
     def test_missing_token_falls_back_to_human(self):
         plugin = self.configure({"enabled": True, "transport": "cloud_api", "phone_number_id": "123", "access_token": ""})
