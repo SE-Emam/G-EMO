@@ -1,4 +1,5 @@
 import json
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,7 +51,7 @@ class WhatsAppPluginTests(unittest.TestCase):
     def test_api_http_error_is_not_misreported_as_human_fallback(self):
         plugin = self.configure({"transport": "cloud_api", "phone_number_id": "123", "access_token": "test-token"})
         import urllib.error
-        with patch("plugins.whatsapp_plugin.urllib.request.urlopen", side_effect=urllib.error.HTTPError("https://example.invalid", 401, "Unauthorized", {}, None)):
+        with patch("plugins.whatsapp_plugin.urllib.request.urlopen", side_effect=urllib.error.HTTPError("https://example.invalid", 401, "Unauthorized", {}, io.BytesIO(b"{}"))):
             result = plugin.execute({"phone": "201000000000", "text": "Hello"}, confirmed=True)
         self.assertEqual(result["status"], "SEND_FAILED")
         self.assertEqual(result["http_status"], 401)
