@@ -17,6 +17,10 @@ The repository now contains an initial native service source and XML declaration
 - Commands written to the private inbox remain untrusted and must pass the Python inbox validator and parser before any action is considered.
 - The command queue is app-private and uses per-request files to avoid partial writes.
 
+## Platform-policy gate
+
+Android's official AccessibilityService guidance states that these services should be used to help users with disabilities interact with Android apps. G-EMO's general-purpose mobile-agent use case may not qualify for Google Play distribution under that guidance/policy. Before any Play Store release, perform a documented policy review and do not misrepresent the app as an accessibility aid. Sideloaded testing does not remove Android runtime consent, privacy, or user-control requirements.
+
 ## Required completion gates
 
 1. Wire native Java source and XML into the Buildozer/python-for-android build using documented configuration options.
