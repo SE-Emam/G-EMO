@@ -6,7 +6,6 @@ There is intentionally no plaintext-file fallback.
 """
 from __future__ import annotations
 
-import base64
 import os
 from typing import Protocol
 
@@ -68,13 +67,6 @@ class AndroidKeystoreTokenStore:
         if name not in self._ALLOWED_NAMES:
             raise SecureStorageError("Unsupported secret identifier")
 
-    @staticmethod
-    def _to_bytes(java_array) -> bytes:
-        try:
-            return bytes(java_array)
-        except Exception as exc:
-            raise SecureStorageError("Unable to process encrypted credential bytes") from exc
-
     def _key(self):
         store = self._KeyStore.getInstance("AndroidKeyStore")
         store.load(None)
@@ -94,9 +86,10 @@ class AndroidKeystoreTokenStore:
             cipher = self._Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(self._Cipher.ENCRYPT_MODE, self._key())
             plaintext = self._JavaString(value).getBytes("UTF-8")
-            encrypted = self._to_bytes(cipher.doFinal(plaintext))
-            iv = self._to_bytes(cipher.getIV())
-            encoded = base64.b64encode(iv).decode("ascii") + "." + base64.b64encode(encrypted).decode("ascii")
+            encrypted = cipher.doFinal(plaintext)
+            iv_text = str(self._Base64.encodeToString(cipher.getIV(), self._Base64.NO_WRAP))
+            cipher_text = str(self._Base64.encodeToString(encrypted, self._Base64.NO_WRAP))
+            encoded = iv_text + "." + cipher_text
             editor = self._prefs.edit()
             editor.putString(name, encoded)
             if not editor.commit():
@@ -113,21 +106,18 @@ class AndroidKeystoreTokenStore:
             return ""
         try:
             iv_text, cipher_text = encoded.split(".", 1)
-            iv = base64.b64decode(iv_text, validate=True)
-            encrypted = base64.b64decode(cipher_text, validate=True)
+            iv = self._Base64.decode(iv_text, self._Base64.NO_WRAP)
+            encrypted = self._Base64.decode(cipher_text, self._Base64.NO_WRAP)
             cipher = self._Cipher.getInstance("AES/GCM/NoPadding")
             key = self._key()
-            spec = self._GCMParameterSpec(128, self._java_byte_array(iv))
+            spec = self._GCMParameterSpec(128, iv)
             cipher.init(self._Cipher.DECRYPT_MODE, key, spec)
-            plaintext = cipher.doFinal(self._java_byte_array(encrypted))
+            plaintext = cipher.doFinal(encrypted)
             return str(self._JavaString(plaintext, "UTF-8"))
         except Exception as exc:
             # Do not silently discard data or fall back to plaintext if key/data is invalid.
             raise SecureStorageError("Credential decryption failed; re-authentication is required") from exc
 
-    def _java_byte_array(self, value: bytes):
-        # Pyjnius accepts a Python byte sequence for Java byte[] arguments.
-        return value
 
     def delete(self, name: str) -> None:
         self._validate(name)
