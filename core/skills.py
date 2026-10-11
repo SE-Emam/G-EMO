@@ -171,7 +171,7 @@ class SkillRegistry:
             state = permission_states.get(permission, "CHECK_FAILED")
             if state not in _PERMISSION_STATES:
                 state = "CHECK_FAILED"
-            if state != "GRANTED" and state != "NOT_APPLICABLE":
+            if state != "GRANTED":
                 return self._result(skill_id, "ACTION_REQUIRED", f"PERMISSION_{state}:{permission}", inputs, started)
         if (spec.requires_approval or spec.side_effect in {"write", "destructive", "external"}) and not approved:
             return self._result(skill_id, "NEEDS_APPROVAL", "USER_APPROVAL_REQUIRED", inputs, started)
